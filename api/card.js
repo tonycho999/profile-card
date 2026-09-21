@@ -42,14 +42,14 @@ export default async function handler(req, res) {
         <style>
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; justify-content: center; }
             .profile-card { background: white; padding: 30px 20px; border-radius: 16px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
-            .profile-name { font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #333; }
-            .profile-content { text-align: left; font-size: 15px; line-height: 1.6; color: #555; border-top: 1px solid #eee; padding-top: 20px; }
+            /* 상단 중복 이름 삭제로 인해 profile-name 스타일은 사용하지 않지만 남겨두어도 무방합니다 */
+            .profile-content { text-align: left; font-size: 15px; line-height: 1.6; color: #555; }
             .profile-content img { max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
         </style>
     </head>
     <body>
         <div class="profile-card">
-            <h2 class="profile-name">${profileName}</h2>
+            <!-- <h2 class="profile-name">...</h2> 부분을 삭제하여 중복 이름을 없앴습니다. -->
             <div class="profile-content">${profileContent}</div>
         </div>
     </body>
