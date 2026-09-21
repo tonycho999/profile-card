@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>디지털 명함 생성기</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        
+        /* 1. 입력부 디자인 */
+        .input-section { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; margin-bottom: 20px; box-sizing: border-box; }
+        .input-section input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        .input-section button { width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .input-section button:hover { background-color: #0056b3; }
+
+        /* 2. 명함 출력부 디자인 */
+        .profile-card { background: white; padding: 30px 20px; border-radius: 16px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); width: 100%; max-width: 400px; box-sizing: border-box; display: none; /* 처음엔 숨김 */ text-align: center; }
+        .profile-img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; background-color: #e9ecef; margin-bottom: 15px; }
+        .profile-name { font-size: 24px; font-weight: bold; margin: 0 0 10px 0; color: #333; }
+        .profile-content { text-align: left; margin-top: 20px; font-size: 15px; line-height: 1.6; color: #555; border-top: 1px solid #eee; padding-top: 20px; }
+        
+        /* 블로그에서 가져온 이미지 크기 제어 */
+        .profile-content img { max-width: 100%; height: auto; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. 블로그 URL 입력 화면 -->
+    <div class="input-section">
+        <h3>🔗 명함 정보 가져오기</h3>
+        <input type="text" id="blogUrl" placeholder="Blogger 글 주소를 입력하세요">
+        <button onclick="fetchProfile()">JSON으로 가져오기</button>
+    </div>
+
+    <!-- 2. 결과가 보여질 명함 화면 -->
+    <div class="profile-card" id="profileCard">
+        <!-- 기본 사진 (원하시면 기본 이미지 주소로 변경 가능) -->
+        <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="Profile" class="profile-img">
+        
+        <!-- 블로그 제목(이름)이 들어갈 자리 -->
+        <h2 class="profile-name" id="nameArea">이름</h2>
+        
+        <!-- 블로그 본문이 들어갈 자리 -->
+        <div class="profile-content" id="contentArea">
+            내용을 불러오는 중입니다...
+        </div>
+    </div>
+
+    <script>
+        function fetchProfile() {
+            const inputUrl = document.getElementById("blogUrl").value.trim();
+            if (!inputUrl) {
+                alert("URL을 입력해주세요!");
+                return;
+            }
+
+            try {
+                // 1. 입력받은 일반 URL을 분석하여 JSON URL로 변환
+                const urlObj = new URL(inputUrl);
+                const origin = urlObj.origin; // 예: https://tony-almanac.blogspot.com
+                const path = urlObj.pathname; // 예: /2026/06/upgrade-your-career.html
+                
+                // 블로그 글 경로(path)를 이용해 특정 글의 JSON 데이터만 요청하는 마법의 주소 완성
+                const jsonUrl = `${origin}/feeds/posts/default?alt=json&path=${path}`;
+
+                // 2. 데이터 가져오기 (Fetch API)
+                fetch(jsonUrl)
+                    .then(response => response.json())
+                    .then(data => {
+                        // 결과값이 없는 경우 처리
+                        if (!data.feed.entry || data.feed.entry.length === 0) {
+                            alert("데이터를 찾을 수 없습니다. URL을 확인해주세요.");
+                            return;
+                        }
+
+                        // JSON에서 제목(이름)과 본문 추출
+                        const entry = data.feed.entry[0];
+                        const name = entry.title.$t;
+                        const content = entry.content.$t;
+
+                        // 화면에 데이터 적용
+                        document.getElementById("nameArea").innerText = name;
+                        document.getElementById("contentArea").innerHTML = content;
+                        
+                        // 숨겨둔 명함 카드 보여주기
+                        document.getElementById("profileCard").style.display = "block";
+
+                        // ★ 3. 브라우저 주소창 변경 로직 (핵심)
+                        // 페이지 새로고침 없이 주소창을 "/이름" 형태로 변경합니다.
+                        const newUrl = "/" + encodeURIComponent(name);
+                        window.history.pushState({ path: newUrl }, '', newUrl);
+                    })
+                    .catch(error => {
+                        console.error("에러 발생:", error);
+                        alert("데이터를 가져오는 중 오류가 발생했습니다.");
+                    });
+            } catch (e) {
+                alert("유효한 URL이 아닙니다. 정확한 주소를 입력해주세요.");
+            }
+        }
+    </script>
+</body>
+</html>
