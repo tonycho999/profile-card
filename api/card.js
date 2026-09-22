@@ -39,13 +39,30 @@ export default async function handler(req, res) {
         <meta property="og:title" content="${profileName}님의 디지털 명함">
         <meta property="og:description" content="클릭하여 명함 및 상세 정보를 확인하세요.">
         
-        <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; justify-content: center; }
-            .profile-card { background: white; padding: 30px 20px; border-radius: 16px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
-            /* 상단 중복 이름 삭제로 인해 profile-name 스타일은 사용하지 않지만 남겨두어도 무방합니다 */
-            .profile-content { text-align: left; font-size: 15px; line-height: 1.6; color: #555; }
-            .profile-content img { max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
-        </style>
+<style>
+    body { 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        background-color: #f0f2f5; 
+        margin: 0; 
+        padding: 20px; 
+        display: flex; 
+        justify-content: center; 
+        align-items: flex-start; /* ★ 이 부분이 핵심! 화면이 길어질 때 짤림 방지 */
+        min-height: 100vh;
+    }
+    .profile-card { 
+        background: white; 
+        padding: 30px 20px; 
+        border-radius: 16px; 
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1); 
+        width: 100%; 
+        max-width: 400px; 
+        text-align: center; 
+        margin-bottom: 40px; /* ★ 맨 아래 여유 공간 추가 */
+    }
+    /* 나머지 기존 스타일은 그대로 유지... */
+</style>
+
     </head>
     <body>
         <div class="profile-card">
