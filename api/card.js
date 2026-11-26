@@ -118,25 +118,26 @@ export default async function handler(req, res) {
                 cursor: pointer;
             }
 
-            .profile-card { 
-                background: white; 
-                padding: 30px 20px; 
-                border-radius: 16px; 
-                box-shadow: 0 10px 20px rgba(0,0,0,0.1); 
+            /* 메인 레이아웃 박스 (QR과 명함 본문을 모두 포함하는 컨테이너) */
+            .main-container {
                 width: 100%; 
-                max-width: 400px; 
-                text-align: center; 
-                margin-bottom: 24px;
-                box-sizing: border-box;
+                max-width: 400px;
+                display: flex;
+                flex-direction: column;
+                gap: 16px; /* 요소들 사이의 부드러운 간격 */
+                margin-bottom: 40px;
             }
 
-            /* QR 코드 영역 */
-            .qr-section {
-                margin-top: 24px;
-                padding-top: 20px;
-                border-top: 1px dashed #e2e8f0;
+            /* QR 코드 전용 독립형 상단 카드 */
+            .qr-card {
+                background: white; 
+                padding: 20px; 
+                border-radius: 16px; 
+                box-shadow: 0 10px 20px rgba(0,0,0,0.05); 
+                text-align: center;
+                box-sizing: border-box;
             }
-            .qr-section img {
+            .qr-card img {
                 border-radius: 8px;
                 box-shadow: 0 2px 8px rgba(0,0,0,0.06);
             }
@@ -144,6 +145,16 @@ export default async function handler(req, res) {
                 font-size: 12px;
                 color: #64748b;
                 margin-top: 8px;
+            }
+
+            /* 명함 본문 카드 */
+            .profile-card { 
+                background: white; 
+                padding: 30px 20px; 
+                border-radius: 16px; 
+                box-shadow: 0 10px 20px rgba(0,0,0,0.1); 
+                text-align: center;
+                box-sizing: border-box;
             }
         </style>
     </head>
@@ -156,15 +167,20 @@ export default async function handler(req, res) {
         </div>
         ` : ''}
 
-        <!-- 2. 명함 본문 카드 -->
-        <div class="profile-card">
-            <div class="profile-content">${profileContent}</div>
-
-            <!-- 명함 내 QR 코드 (스캔 시 ?from=qr로 접속됨) -->
-            <div class="qr-section">
-                <img src="${qrImageUrl}" alt="명함 공유용 QR 코드" width="140" height="140" />
+        <!-- 2. 메인 컨테이너 영역 -->
+        <div class="main-container">
+            
+            <!-- [위치 변경 지점] QR 카드를 명함 본문 카드의 상단에 배치 -->
+            <div class="qr-card">
+                <img src="${qrImageUrl}" alt="명함 공유용 QR 코드" width="130" height="130" />
                 <div class="qr-caption">카메라로 스캔하여 명함 공유 (?from=qr)</div>
             </div>
+
+            <!-- 명함 본문 카드 -->
+            <div class="profile-card">
+                <div class="profile-content">${profileContent}</div>
+            </div>
+
         </div>
 
         <!-- 3. PWA 설치 처리 스크립트 (QR 접속 시 제외) -->
