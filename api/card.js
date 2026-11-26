@@ -166,7 +166,7 @@ export default async function handler(req, res) {
             ${!isFromQr ? `
             <div id="qrCodeSection" class="qr-card">
                 <img src="${qrImageUrl}" alt="명함 공유용 QR 코드" width="130" height="130" />
-                <div class="qr-caption">카메라로 스캔하여 명함 공유 (?source=qr)</div>
+                <div class="qr-caption">카메라로 스캔하여 명함 공유 </div>
             </div>
             ` : ''}
 
