@@ -111,11 +111,12 @@ export default async function handler(req, res) {
                 margin-bottom: 40px;
             }
 
+            /* 연락처 저장 버튼 스타일 */
             .save-contact-btn {
                 background: #10b981;
                 color: white;
                 border: none;
-                padding: 14px;
+                padding: 15px;
                 border-radius: 12px;
                 font-size: 16px;
                 font-weight: bold;
@@ -134,6 +135,7 @@ export default async function handler(req, res) {
                 background: #059669;
             }
 
+            /* QR 코드 카드 */
             .qr-card {
                 background: white; 
                 padding: 20px; 
@@ -148,6 +150,7 @@ export default async function handler(req, res) {
             }
             .qr-caption { font-size: 12px; color: #64748b; margin-top: 8px; }
 
+            /* 명함 본문 카드 */
             .profile-card { 
                 background: white; 
                 padding: 30px 20px; 
@@ -156,6 +159,49 @@ export default async function handler(req, res) {
                 text-align: center;
                 box-sizing: border-box;
                 line-height: 1.6;
+            }
+
+            /* 하단 정보 / 회사 링크 전용 섹션 */
+            .links-card {
+                background: white;
+                padding: 20px;
+                border-radius: 16px;
+                box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+            .links-title {
+                font-size: 14px;
+                font-weight: bold;
+                color: #475569;
+                margin-bottom: 4px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .info-link-btn {
+                background: #f1f5f9;
+                color: #334155;
+                text-decoration: none;
+                padding: 12px 16px;
+                border-radius: 10px;
+                font-size: 14px;
+                font-weight: 600;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                transition: background 0.15s ease, transform 0.1s ease;
+                border: 1px solid #e2e8f0;
+            }
+            .info-link-btn:active {
+                background: #e2e8f0;
+                transform: scale(0.99);
+            }
+            .info-link-btn span.arrow {
+                color: #94a3b8;
+                font-weight: bold;
             }
         </style>
     </head>
@@ -183,19 +229,33 @@ export default async function handler(req, res) {
             <div class="profile-card">
                 <div class="profile-content">${profileContent}</div>
             </div>
+
+            <!-- 4. 하단 회사 정보 / 커스텀 외부 링크 영역 -->
+            <div class="links-card">
+                <div class="links-title">🔗 추가 정보 및 연결 링크</div>
+                
+                <!-- 이곳에 원하시는 링크 버튼을 마음껏 자유롭게 추가하세요! -->
+                <a href="https://your-company.com" target="_blank" class="info-link-btn">
+                    🏢 회사 공식 홈페이지 바로가기 <span class="arrow">➔</span>
+                </a>
+                
+                <a href="https://blog.naver.com/your-id" target="_blank" class="info-link-btn">
+                    ✍️ 공식 네이버 블로그 방문 <span class="arrow">➔</span>
+                </a>
+
+                <a href="https://instagram.com/your-id" target="_blank" class="info-link-btn">
+                    📸 공식 인스타그램 연결 <span class="arrow">➔</span>
+                </a>
+            </div>
         </div>
 
+        <!-- 연락처 추출 및 포맷 조립 스크립트 (이동 로직 제거) -->
         <script>
-            // 연락처 저장 후 이동할 페이지 (필요 없으면 빈 문자열 '' 로 설정)
-            // 예: 회사 홈페이지나 카카오톡 채널, 감사 인사 페이지 등
-            const REDIRECT_URL = ''; 
-
             document.getElementById('saveContactBtn').addEventListener('click', () => {
                 const profileCard = document.querySelector('.profile-card');
                 const rawText = profileCard ? profileCard.innerText : '';
                 const lines = rawText.split('\\n').map(l => l.trim()).filter(Boolean);
 
-                // --- 1. 본문 텍스트 패턴 매칭 및 추출 함수 ---
                 const findByPrefix = (keywords) => {
                     for (const line of lines) {
                         for (const kw of keywords) {
@@ -207,38 +267,30 @@ export default async function handler(req, res) {
                     return '';
                 };
 
-                // --- 2. 각 필드별 스마트 추출 ---
                 const detectedName = "${profileName}".trim();
 
-                // 휴대전화 (010 번호 우선 감지)
                 const mobileMatch = rawText.match(/010[-.\\s]?\\d{4}[-.\\s]?\\d{4}/);
                 const mobilePhone = mobileMatch ? mobileMatch[0].replace(/[^0-9]/g, '') : '';
 
-                // 일반/회사 유선전화 (02, 031, 070 등)
                 const workPhoneMatch = rawText.match(/(?:02|0[3-6][1-5]|070)[-.\\s]?\\d{3,4}[-.\\s]?\\d{4}/);
                 const workPhone = workPhoneMatch ? workPhoneMatch[0].replace(/[^0-9]/g, '') : '';
 
-                // 이메일
                 const emailMatch = rawText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/);
                 const email = emailMatch ? emailMatch[0] : '';
 
-                // 회사명, 부서, 직급 (키워드로 탐색)
                 const company = findByPrefix(['회사', '소속', '직장', '상호', 'Company']);
                 const department = findByPrefix(['부서', '팀', '본부', 'Department']);
                 const title = findByPrefix(['직급', '직책', '직함', '포지션', 'Title']);
 
-                // 주소 (키워드 또는 서울/경기 등 시도 명칭으로 탐색)
                 let address = findByPrefix(['주소', '위치', '오시는 길', 'Address', 'Location']);
                 if (!address) {
                     const addrMatch = rawText.match(/(?:서울|경기|인천|부산|대구|광주|대전|울산|세종|강원|충북|충남|전북|전남|경북|경남|제주)[가-힣\\s0-9-]+(?:로|길|동|읍|면|번지)\\s?[0-9-]*/);
                     if (addrMatch) address = addrMatch[0];
                 }
 
-                // 웹사이트 URL (http/https 링크 중 첫 번째)
                 const urlMatch = rawText.match(/https?:\\/\\/[^\\s]+/);
                 const website = urlMatch ? urlMatch[0] : '';
 
-                // --- 3. 존재하는 항목만 vCard 3.0 포맷으로 조립 (빈 값은 자동 스킵) ---
                 const vcardParts = [
                     'BEGIN:VCARD',
                     'VERSION:3.0',
@@ -254,7 +306,6 @@ export default async function handler(req, res) {
                 }
                 if (title) vcardParts.push('TITLE;CHARSET=UTF-8:' + title);
                 if (address) {
-                    // vCard 주소 규격: ;;상세주소;도시;주;우편번호;국가
                     vcardParts.push('ADR;TYPE=WORK;CHARSET=UTF-8:;;' + address + ';;;;');
                 }
                 if (website) vcardParts.push('URL:' + website);
@@ -262,7 +313,7 @@ export default async function handler(req, res) {
                 vcardParts.push('END:VCARD');
                 const vcardString = vcardParts.join('\\r\\n');
 
-                // --- 4. OS 호환 다운로드 트리거 ---
+                // 다운로드 트리거
                 const blob = new Blob([vcardString], { type: 'text/vcard;charset=utf-8;' });
                 const fileName = detectedName + '.vcf';
                 const link = document.createElement('a');
@@ -276,14 +327,6 @@ export default async function handler(req, res) {
                 document.body.removeChild(link);
 
                 setTimeout(() => URL.revokeObjectURL(url), 100);
-
-                // --- 5. 저장 트리거 후 페이지 이동 처리 (옵션) ---
-                if (REDIRECT_URL) {
-                    // 파일 다운로드 창이 뜨는 시간을 고려해 1.5초 후 이동
-                    setTimeout(() => {
-                        window.location.href = REDIRECT_URL;
-                    }, 1500);
-                }
             });
         </script>
 
