@@ -19,8 +19,8 @@ export default async function handler(req, res) {
     const profileName = entry.title.$t;
     const profileContent = entry.content.$t;
 
-    // --- 1. 블로그 본문에서 첫 번째 이미지(사진) URL 동적 추출 ---
-    let profileImageUrl = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"; // 기본 프로필 사진 아이콘 (대체용)
+    // --- 1. 블로그 본문에서 첫 번째 이미지(사진) URL 동적 추출 (바탕화면 PWA 아이콘용) ---
+    let profileImageUrl = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"; // 기본 대체 이미지
     const imgRegex = /<img[^>]+src=["']([^"']+)["']/i;
     const match = profileContent.match(imgRegex);
     if (match && match[1]) {
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     
     const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrTargetUrl)}`;
 
-    // --- 2. 동적으로 추출한 사진을 PWA 바탕화면 앱 아이콘으로 등록 ---
+    // --- 2. PWA Manifest 설정 (바탕화면 설치 시 본인 사진이 아이콘으로 적용됨) ---
     const manifestJson = {
       name: `${profileName}님의 명함`,
       short_name: profileName,
@@ -44,7 +44,7 @@ export default async function handler(req, res) {
       theme_color: "#2563eb",
       icons: [
         {
-          src: profileImageUrl, // 본인 사진 적용
+          src: profileImageUrl, // 동적 추출된 이미지 적용
           sizes: "512x512",
           type: "image/png",
           purpose: "any maskable"
@@ -68,7 +68,7 @@ export default async function handler(req, res) {
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="default">
         <meta name="apple-mobile-web-app-title" content="${profileName}">
-        <link rel="apple-touch-icon" href="${profileImageUrl}"> <!-- 아이폰 홈 화면 아이콘용 -->
+        <link rel="apple-touch-icon" href="${profileImageUrl}">
         ` : ''}
 
         <meta property="og:title" content="${profileName}님의 디지털 명함">
@@ -89,6 +89,7 @@ export default async function handler(req, res) {
                 box-sizing: border-box;
             }
 
+            /* 앱 설치 배너 */
             .install-banner {
                 background: #2563eb;
                 color: #ffffff;
@@ -123,7 +124,8 @@ export default async function handler(req, res) {
                 margin-bottom: 40px;
             }
 
-            .save-contact-btn {
+            /* (선택 사항) 상단 연락처 저장 버튼 활성화 시 스타일 */
+            .save-contact-btn-top {
                 background: #10b981;
                 color: white;
                 border: none;
@@ -141,11 +143,12 @@ export default async function handler(req, res) {
                 box-sizing: border-box;
                 transition: transform 0.1s ease;
             }
-            .save-contact-btn:active {
+            .save-contact-btn-top:active {
                 transform: scale(0.98);
                 background: #059669;
             }
 
+            /* QR 코드 카드 */
             .qr-card {
                 background: white; 
                 padding: 20px; 
@@ -170,67 +173,6 @@ export default async function handler(req, res) {
                 box-sizing: border-box;
                 line-height: 1.6;
             }
-
-            /* 동적 원형 프로필 이미지 스타일 */
-            .profile-avatar-wrapper {
-                margin: -10px auto 20px auto;
-                width: 110px;
-                height: 110px;
-                border-radius: 50%;
-                padding: 4px;
-                background: white;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-                display: inline-block;
-            }
-            .profile-avatar {
-                width: 100%;
-                height: 100%;
-                object-fit: cover;
-                border-radius: 50%;
-            }
-
-            /* 하단 정보 / 회사 링크 전용 섹션 */
-            .links-card {
-                background: white;
-                padding: 20px;
-                border-radius: 16px;
-                box-shadow: 0 10px 20px rgba(0,0,0,0.05);
-                box-sizing: border-box;
-                display: flex;
-                flex-direction: column;
-                gap: 12px;
-            }
-            .links-title {
-                font-size: 14px;
-                font-weight: bold;
-                color: #475569;
-                margin-bottom: 4px;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-            }
-            .info-link-btn {
-                background: #f1f5f9;
-                color: #334155;
-                text-decoration: none;
-                padding: 12px 16px;
-                border-radius: 10px;
-                font-size: 14px;
-                font-weight: 600;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                transition: background 0.15s ease, transform 0.1s ease;
-                border: 1px solid #e2e8f0;
-            }
-            .info-link-btn:active {
-                background: #e2e8f0;
-                transform: scale(0.99);
-            }
-            .info-link-btn span.arrow {
-                color: #94a3b8;
-                font-weight: bold;
-            }
         </style>
     </head>
     <body>
@@ -248,40 +190,22 @@ export default async function handler(req, res) {
                 <div class="qr-caption">카메라로 스캔하여 명함 공유 (?from=qr)</div>
             </div>
 
-            <!-- 2. 스마트폰 연락처 저장 버튼 -->
-            <button id="saveContactBtn" class="save-contact-btn">
+            <!-- 2. (옵션) 상단 고정 저장 버튼 (필요할 경우 아래 주석 해제) -->
+            <!--
+            <button id="topSaveContactBtn" class="save-contact-btn-top">
                 👤 연락처 스마트폰에 저장하기
             </button>
+            -->
 
-            <!-- 3. 명함 본문 카드 -->
+            <!-- 3. 명함 본문 카드 (중복 원형 아바타를 지우고 깔끔하게 본문만 출력) -->
             <div class="profile-card">
-                <!-- 동적으로 분석한 프로필 사진이 명함 안의 최상단에 원형으로 깔끔하게 배치됩니다 -->
-                <div class="profile-avatar-wrapper">
-                    <img class="profile-avatar" src="${profileImageUrl}" alt="${profileName} 프로필 사진">
-                </div>
                 <div class="profile-content">${profileContent}</div>
-            </div>
-
-            <!-- 4. 하단 회사 정보 / 커스텀 외부 링크 영역 -->
-            <div class="links-card">
-                <div class="links-title">🔗 추가 정보 및 연결 링크</div>
-                
-                <a href="https://your-company.com" target="_blank" class="info-link-btn">
-                    🏢 회사 공식 홈페이지 바로가기 <span class="arrow">➔</span>
-                </a>
-                
-                <a href="https://blog.naver.com/your-id" target="_blank" class="info-link-btn">
-                    ✍️ 공식 네이버 블로그 방문 <span class="arrow">➔</span>
-                </a>
-
-                <a href="https://instagram.com/your-id" target="_blank" class="info-link-btn">
-                    📸 공식 인스타그램 연결 <span class="arrow">➔</span>
-                </a>
             </div>
         </div>
 
         <script>
-            document.getElementById('saveContactBtn').addEventListener('click', () => {
+            // 공통 연락처 저장 기능 로직
+            const triggerSaveContact = () => {
                 const profileCard = document.querySelector('.profile-card');
                 const rawText = profileCard ? profileCard.innerText : '';
                 const lines = rawText.split('\\n').map(l => l.trim()).filter(Boolean);
@@ -341,8 +265,8 @@ export default async function handler(req, res) {
                 if (website) vcardParts.push('URL:' + website);
 
                 vcardParts.push('END:VCARD');
-                const vcardString = vcardParts.join('\\r\\n');
 
+                const vcardString = vcardParts.join('\\r\\n');
                 const blob = new Blob([vcardString], { type: 'text/vcard;charset=utf-8;' });
                 const fileName = detectedName + '.vcf';
                 const link = document.createElement('a');
@@ -356,6 +280,26 @@ export default async function handler(req, res) {
                 document.body.removeChild(link);
 
                 setTimeout(() => URL.revokeObjectURL(url), 100);
+            };
+
+            // 이벤트 바인딩 로직 (상단 고정 버튼 & 블로그 내부 버튼 모두 감지 가능)
+            document.addEventListener('DOMContentLoaded', () => {
+                // 1) 상단 옵션 버튼이 켜져있을 경우 연동
+                const topBtn = document.getElementById('topSaveContactBtn');
+                if (topBtn) {
+                    topBtn.addEventListener('click', triggerSaveContact);
+                }
+
+                // 2) 블로그 본문 내에 생성하신 [Save] 버튼을 자동으로 감지하여 저장 기능 연동
+                // 블로그 글 작성 시, 버튼 요소에 id="saveContactBtn" 또는 class="save-contact-btn"을 지정하시면 작동합니다.
+                const blogBtn = document.getElementById('saveContactBtn') || document.querySelector('.save-contact-btn');
+                if (blogBtn) {
+                    blogBtn.removeAttribute('href'); // 링크가 열리지 않도록 초기화
+                    blogBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        triggerSaveContact();
+                    });
+                }
             });
         </script>
 
