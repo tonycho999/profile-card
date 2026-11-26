@@ -65,7 +65,7 @@ export default async function handler(req, res) {
 
         <style>
             body { 
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
                 background-color: #f0f2f5; 
                 margin: 0; 
                 padding: 20px; 
@@ -111,9 +111,8 @@ export default async function handler(req, res) {
                 margin-bottom: 40px;
             }
 
-            /* 연락처 저장 버튼 스타일 */
             .save-contact-btn {
-                background: #10b981; /* 눈에 띄는 초록색 계열 */
+                background: #10b981;
                 color: white;
                 border: none;
                 padding: 14px;
@@ -126,11 +125,12 @@ export default async function handler(req, res) {
                 justify-content: center;
                 align-items: center;
                 gap: 8px;
-                transition: background 0.2s ease;
                 width: 100%;
                 box-sizing: border-box;
+                transition: transform 0.1s ease;
             }
             .save-contact-btn:active {
+                transform: scale(0.98);
                 background: #059669;
             }
 
@@ -155,6 +155,7 @@ export default async function handler(req, res) {
                 box-shadow: 0 10px 20px rgba(0,0,0,0.1); 
                 text-align: center;
                 box-sizing: border-box;
+                line-height: 1.6;
             }
         </style>
     </head>
@@ -167,75 +168,121 @@ export default async function handler(req, res) {
         ` : ''}
 
         <div class="main-container">
-            
-            <!-- QR 코드 카드 (상단) -->
+            <!-- 1. 상단 QR 코드 카드 -->
             <div class="qr-card">
                 <img src="${qrImageUrl}" alt="명함 공유용 QR 코드" width="130" height="130" />
                 <div class="qr-caption">카메라로 스캔하여 명함 공유 (?from=qr)</div>
             </div>
 
-            <!-- 스마트폰 연락처 저장 버튼 -->
+            <!-- 2. 스마트폰 연락처 저장 버튼 -->
             <button id="saveContactBtn" class="save-contact-btn">
                 👤 연락처 스마트폰에 저장하기
             </button>
 
-            <!-- 명함 본문 카드 -->
+            <!-- 3. 명함 본문 카드 -->
             <div class="profile-card">
                 <div class="profile-content">${profileContent}</div>
             </div>
-
         </div>
 
-        <!-- 연락처 변환 및 OS별 저장 트리거 스크립트 -->
         <script>
+            // 연락처 저장 후 이동할 페이지 (필요 없으면 빈 문자열 '' 로 설정)
+            // 예: 회사 홈페이지나 카카오톡 채널, 감사 인사 페이지 등
+            const REDIRECT_URL = ''; 
+
             document.getElementById('saveContactBtn').addEventListener('click', () => {
-                // 1. 블로그 본문 HTML에서 텍스트 정보만 정제하여 가져옵니다.
                 const profileCard = document.querySelector('.profile-card');
                 const rawText = profileCard ? profileCard.innerText : '';
+                const lines = rawText.split('\\n').map(l => l.trim()).filter(Boolean);
 
-                // 2. 본문 텍스트 내에서 전화번호와 이메일을 자동 감지하는 정규식
-                const phoneRegex = /(?:010|02|0[3-6][1-9])[-.\\s]?\\d{3,4}[-.\\s]?\\d{4}/g;
-                const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/g;
+                // --- 1. 본문 텍스트 패턴 매칭 및 추출 함수 ---
+                const findByPrefix = (keywords) => {
+                    for (const line of lines) {
+                        for (const kw of keywords) {
+                            if (line.toLowerCase().startsWith(kw.toLowerCase())) {
+                                return line.substring(kw.length).replace(/^[:\\-\\s]+/, '').trim();
+                            }
+                        }
+                    }
+                    return '';
+                };
 
-                const phones = rawText.match(phoneRegex) || [];
-                const emails = rawText.match(emailRegex) || [];
-
-                const detectedPhone = phones[0] || '';
-                const detectedEmail = emails[0] || '';
+                // --- 2. 각 필드별 스마트 추출 ---
                 const detectedName = "${profileName}".trim();
 
-                // 3. 연락처 표준 규격인 vCard 3.0 문자열 생성
-                const vcard = [
+                // 휴대전화 (010 번호 우선 감지)
+                const mobileMatch = rawText.match(/010[-.\\s]?\\d{4}[-.\\s]?\\d{4}/);
+                const mobilePhone = mobileMatch ? mobileMatch[0].replace(/[^0-9]/g, '') : '';
+
+                // 일반/회사 유선전화 (02, 031, 070 등)
+                const workPhoneMatch = rawText.match(/(?:02|0[3-6][1-5]|070)[-.\\s]?\\d{3,4}[-.\\s]?\\d{4}/);
+                const workPhone = workPhoneMatch ? workPhoneMatch[0].replace(/[^0-9]/g, '') : '';
+
+                // 이메일
+                const emailMatch = rawText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/);
+                const email = emailMatch ? emailMatch[0] : '';
+
+                // 회사명, 부서, 직급 (키워드로 탐색)
+                const company = findByPrefix(['회사', '소속', '직장', '상호', 'Company']);
+                const department = findByPrefix(['부서', '팀', '본부', 'Department']);
+                const title = findByPrefix(['직급', '직책', '직함', '포지션', 'Title']);
+
+                // 주소 (키워드 또는 서울/경기 등 시도 명칭으로 탐색)
+                let address = findByPrefix(['주소', '위치', '오시는 길', 'Address', 'Location']);
+                if (!address) {
+                    const addrMatch = rawText.match(/(?:서울|경기|인천|부산|대구|광주|대전|울산|세종|강원|충북|충남|전북|전남|경북|경남|제주)[가-힣\\s0-9-]+(?:로|길|동|읍|면|번지)\\s?[0-9-]*/);
+                    if (addrMatch) address = addrMatch[0];
+                }
+
+                // 웹사이트 URL (http/https 링크 중 첫 번째)
+                const urlMatch = rawText.match(/https?:\\/\\/[^\\s]+/);
+                const website = urlMatch ? urlMatch[0] : '';
+
+                // --- 3. 존재하는 항목만 vCard 3.0 포맷으로 조립 (빈 값은 자동 스킵) ---
+                const vcardParts = [
                     'BEGIN:VCARD',
                     'VERSION:3.0',
-                    'FN:' + detectedName,               // 전체 이름
-                    'N:;' + detectedName + ';;;',       // 이름 상세 분류
-                    detectedPhone ? 'TEL;TYPE=CELL:' + detectedPhone : '', // 핸드폰 번호
-                    detectedEmail ? 'EMAIL;TYPE=PREF,INTERNET:' + detectedEmail : '', // 이메일 주소
-                    'END:VCARD'
-                ].filter(Boolean).join('\\n');
+                    'FN;CHARSET=UTF-8:' + detectedName,
+                    'N;CHARSET=UTF-8:;' + detectedName + ';;;'
+                ];
 
-                // 4. 안드로이드와 iOS에서 안정적으로 호환되는 통합 다운로드 트리거
-                const blob = new Blob([vcard], { type: 'text/vcard;charset=utf-8;' });
+                if (mobilePhone) vcardParts.push('TEL;TYPE=CELL,VOICE:' + mobilePhone);
+                if (workPhone && workPhone !== mobilePhone) vcardParts.push('TEL;TYPE=WORK,VOICE:' + workPhone);
+                if (email) vcardParts.push('EMAIL;TYPE=PREF,INTERNET:' + email);
+                if (company || department) {
+                    vcardParts.push('ORG;CHARSET=UTF-8:' + (company || '') + ';' + (department || ''));
+                }
+                if (title) vcardParts.push('TITLE;CHARSET=UTF-8:' + title);
+                if (address) {
+                    // vCard 주소 규격: ;;상세주소;도시;주;우편번호;국가
+                    vcardParts.push('ADR;TYPE=WORK;CHARSET=UTF-8:;;' + address + ';;;;');
+                }
+                if (website) vcardParts.push('URL:' + website);
+
+                vcardParts.push('END:VCARD');
+                const vcardString = vcardParts.join('\\r\\n');
+
+                // --- 4. OS 호환 다운로드 트리거 ---
+                const blob = new Blob([vcardString], { type: 'text/vcard;charset=utf-8;' });
                 const fileName = detectedName + '.vcf';
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                
+                link.setAttribute('href', url);
+                link.setAttribute('download', fileName);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
 
-                if (navigator.msSaveBlob) { // IE 대응
-                    navigator.msSaveBlob(blob, fileName);
-                } else {
-                    const link = document.createElement('a');
-                    if (link.download !== undefined) {
-                        // iOS Safari 및 최신 모바일 브라우저를 위해 Object URL 사용
-                        const url = URL.createObjectURL(blob);
-                        link.setAttribute('href', url);
-                        link.setAttribute('download', fileName);
-                        link.style.visibility = 'hidden';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        
-                        // 메모리 해제
-                        setTimeout(() => URL.revokeObjectURL(url), 100);
-                    }
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+
+                // --- 5. 저장 트리거 후 페이지 이동 처리 (옵션) ---
+                if (REDIRECT_URL) {
+                    // 파일 다운로드 창이 뜨는 시간을 고려해 1.5초 후 이동
+                    setTimeout(() => {
+                        window.location.href = REDIRECT_URL;
+                    }, 1500);
                 }
             });
         </script>
