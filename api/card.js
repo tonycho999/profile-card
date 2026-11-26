@@ -173,7 +173,7 @@ export default async function handler(req, res) {
             <!-- [위치 변경 지점] QR 카드를 명함 본문 카드의 상단에 배치 -->
             <div class="qr-card">
                 <img src="${qrImageUrl}" alt="명함 공유용 QR 코드" width="130" height="130" />
-                <div class="qr-caption">카메라로 스캔하여 명함 공유 (?from=qr)</div>
+                <div class="qr-caption">카메라로 스캔하여 명함 공유</div>
             </div>
 
             <!-- 명함 본문 카드 -->
