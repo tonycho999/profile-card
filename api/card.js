@@ -19,12 +19,21 @@ export default async function handler(req, res) {
     const profileName = entry.title.$t;
     const profileContent = entry.content.$t;
 
+    // --- 1. 블로그 본문에서 첫 번째 이미지(사진) URL 동적 추출 ---
+    let profileImageUrl = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"; // 기본 프로필 사진 아이콘 (대체용)
+    const imgRegex = /<img[^>]+src=["']([^"']+)["']/i;
+    const match = profileContent.match(imgRegex);
+    if (match && match[1]) {
+      profileImageUrl = match[1];
+    }
+
     const host = req.headers['x-forwarded-host'] || req.headers.host || 'your-domain.vercel.app';
     const protocol = req.headers['x-forwarded-proto'] || 'https';
     const qrTargetUrl = `${protocol}://${host}/${encodeURIComponent(name)}?from=qr`;
     
     const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrTargetUrl)}`;
 
+    // --- 2. 동적으로 추출한 사진을 PWA 바탕화면 앱 아이콘으로 등록 ---
     const manifestJson = {
       name: `${profileName}님의 명함`,
       short_name: profileName,
@@ -35,9 +44,10 @@ export default async function handler(req, res) {
       theme_color: "#2563eb",
       icons: [
         {
-          src: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
+          src: profileImageUrl, // 본인 사진 적용
           sizes: "512x512",
-          type: "image/png"
+          type: "image/png",
+          purpose: "any maskable"
         }
       ]
     };
@@ -58,10 +68,12 @@ export default async function handler(req, res) {
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="default">
         <meta name="apple-mobile-web-app-title" content="${profileName}">
+        <link rel="apple-touch-icon" href="${profileImageUrl}"> <!-- 아이폰 홈 화면 아이콘용 -->
         ` : ''}
 
         <meta property="og:title" content="${profileName}님의 디지털 명함">
         <meta property="og:description" content="클릭하여 명함 및 상세 정보를 확인하세요.">
+        <meta property="og:image" content="${profileImageUrl}">
 
         <style>
             body { 
@@ -111,7 +123,6 @@ export default async function handler(req, res) {
                 margin-bottom: 40px;
             }
 
-            /* 연락처 저장 버튼 스타일 */
             .save-contact-btn {
                 background: #10b981;
                 color: white;
@@ -135,7 +146,6 @@ export default async function handler(req, res) {
                 background: #059669;
             }
 
-            /* QR 코드 카드 */
             .qr-card {
                 background: white; 
                 padding: 20px; 
@@ -159,6 +169,24 @@ export default async function handler(req, res) {
                 text-align: center;
                 box-sizing: border-box;
                 line-height: 1.6;
+            }
+
+            /* 동적 원형 프로필 이미지 스타일 */
+            .profile-avatar-wrapper {
+                margin: -10px auto 20px auto;
+                width: 110px;
+                height: 110px;
+                border-radius: 50%;
+                padding: 4px;
+                background: white;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+                display: inline-block;
+            }
+            .profile-avatar {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                border-radius: 50%;
             }
 
             /* 하단 정보 / 회사 링크 전용 섹션 */
@@ -227,6 +255,10 @@ export default async function handler(req, res) {
 
             <!-- 3. 명함 본문 카드 -->
             <div class="profile-card">
+                <!-- 동적으로 분석한 프로필 사진이 명함 안의 최상단에 원형으로 깔끔하게 배치됩니다 -->
+                <div class="profile-avatar-wrapper">
+                    <img class="profile-avatar" src="${profileImageUrl}" alt="${profileName} 프로필 사진">
+                </div>
                 <div class="profile-content">${profileContent}</div>
             </div>
 
@@ -234,7 +266,6 @@ export default async function handler(req, res) {
             <div class="links-card">
                 <div class="links-title">🔗 추가 정보 및 연결 링크</div>
                 
-                <!-- 이곳에 원하시는 링크 버튼을 마음껏 자유롭게 추가하세요! -->
                 <a href="https://your-company.com" target="_blank" class="info-link-btn">
                     🏢 회사 공식 홈페이지 바로가기 <span class="arrow">➔</span>
                 </a>
@@ -249,7 +280,6 @@ export default async function handler(req, res) {
             </div>
         </div>
 
-        <!-- 연락처 추출 및 포맷 조립 스크립트 (이동 로직 제거) -->
         <script>
             document.getElementById('saveContactBtn').addEventListener('click', () => {
                 const profileCard = document.querySelector('.profile-card');
@@ -313,7 +343,6 @@ export default async function handler(req, res) {
                 vcardParts.push('END:VCARD');
                 const vcardString = vcardParts.join('\\r\\n');
 
-                // 다운로드 트리거
                 const blob = new Blob([vcardString], { type: 'text/vcard;charset=utf-8;' });
                 const fileName = detectedName + '.vcf';
                 const link = document.createElement('a');
