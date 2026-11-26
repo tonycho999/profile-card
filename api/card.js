@@ -1,39 +1,30 @@
 export default async function handler(req, res) {
-  // 1. URL에서 이름 및 쿼리 파라미터 가져오기
   const name = req.query.name;
-  // QR 코드로 접속했는지 여부 확인 (?from=qr 파라미터 체크)
   const isFromQr = req.query.from === 'qr' || req.query.qr === '1';
 
-  // 빈 주소나 파비콘 요청 시 처리
   if (!name || name === 'favicon.ico') {
     return res.status(400).send("이름을 입력해주세요. (예: 주소창 끝에 /홍길동 입력)");
   }
 
   try {
-    // 2. 구글 블로그에서 '이름'으로 검색하여 JSON 데이터 가져오기
     const blogUrl = `https://profilecard9.blogspot.com/feeds/posts/default?q=${encodeURIComponent(name)}&alt=json`;
     const response = await fetch(blogUrl);
     const data = await response.json();
 
-    // 일치하는 명함 데이터가 없는 경우
     if (!data.feed || !data.feed.entry || data.feed.entry.length === 0) {
       return res.status(404).send(`'${name}' 님의 명함 데이터를 블로그에서 찾을 수 없습니다.`);
     }
 
-    // 3. 가장 정확히 검색된 첫 번째 글의 제목과 본문 추출
     const entry = data.feed.entry[0];
     const profileName = entry.title.$t;
     const profileContent = entry.content.$t;
 
-    // 4. 호스트 주소 및 QR 코드 링크 구성 (QR로 찍으면 ?from=qr 로 연결)
     const host = req.headers['x-forwarded-host'] || req.headers.host || 'your-domain.vercel.app';
     const protocol = req.headers['x-forwarded-proto'] || 'https';
     const qrTargetUrl = `${protocol}://${host}/${encodeURIComponent(name)}?from=qr`;
     
-    // 무료 QR 코드 생성 API를 활용한 QR 이미지 URL
     const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrTargetUrl)}`;
 
-    // 5. PWA Manifest (Data URI 방식으로 별도 파일 없이 바로 삽입)
     const manifestJson = {
       name: `${profileName}님의 명함`,
       short_name: profileName,
@@ -52,7 +43,6 @@ export default async function handler(req, res) {
     };
     const manifestDataUri = `data:application/manifest+json;charset=utf-8,${encodeURIComponent(JSON.stringify(manifestJson))}`;
 
-    // 6. Vercel 서버가 완성된 HTML을 조립
     const html = `
     <!DOCTYPE html>
     <html lang="ko">
@@ -61,7 +51,6 @@ export default async function handler(req, res) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${profileName}님의 명함</title>
 
-        <!-- PWA / 모바일 웹앱 메타 태그 (QR 접속이 아닐 때만 적용) -->
         ${!isFromQr ? `
         <link rel="manifest" href="${manifestDataUri}">
         <meta name="theme-color" content="#2563eb">
@@ -71,7 +60,6 @@ export default async function handler(req, res) {
         <meta name="apple-mobile-web-app-title" content="${profileName}">
         ` : ''}
 
-        <!-- 카톡 등 공유 시 나타날 미리보기(OG) 태그 -->
         <meta property="og:title" content="${profileName}님의 디지털 명함">
         <meta property="og:description" content="클릭하여 명함 및 상세 정보를 확인하세요.">
 
@@ -89,7 +77,6 @@ export default async function handler(req, res) {
                 box-sizing: border-box;
             }
 
-            /* 상단 앱 설치 유도 배너 스타일 */
             .install-banner {
                 background: #2563eb;
                 color: #ffffff;
@@ -97,16 +84,13 @@ export default async function handler(req, res) {
                 max-width: 400px;
                 padding: 12px 16px;
                 border-radius: 12px;
-                display: none; /* 스크립트로 조건 충족 시 flex로 변경 */
+                display: none;
                 justify-content: space-between;
                 align-items: center;
                 margin-bottom: 16px;
                 box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
             }
-            .install-banner span {
-                font-size: 14px;
-                font-weight: 600;
-            }
+            .install-banner span { font-size: 14px; font-weight: 600; }
             .install-btn {
                 background: #ffffff;
                 color: #2563eb;
@@ -118,17 +102,38 @@ export default async function handler(req, res) {
                 cursor: pointer;
             }
 
-            /* 메인 레이아웃 박스 (QR과 명함 본문을 모두 포함하는 컨테이너) */
             .main-container {
                 width: 100%; 
                 max-width: 400px;
                 display: flex;
                 flex-direction: column;
-                gap: 16px; /* 요소들 사이의 부드러운 간격 */
+                gap: 16px;
                 margin-bottom: 40px;
             }
 
-            /* QR 코드 전용 독립형 상단 카드 */
+            /* 연락처 저장 버튼 스타일 */
+            .save-contact-btn {
+                background: #10b981; /* 눈에 띄는 초록색 계열 */
+                color: white;
+                border: none;
+                padding: 14px;
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: bold;
+                cursor: pointer;
+                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 8px;
+                transition: background 0.2s ease;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .save-contact-btn:active {
+                background: #059669;
+            }
+
             .qr-card {
                 background: white; 
                 padding: 20px; 
@@ -141,13 +146,8 @@ export default async function handler(req, res) {
                 border-radius: 8px;
                 box-shadow: 0 2px 8px rgba(0,0,0,0.06);
             }
-            .qr-caption {
-                font-size: 12px;
-                color: #64748b;
-                margin-top: 8px;
-            }
+            .qr-caption { font-size: 12px; color: #64748b; margin-top: 8px; }
 
-            /* 명함 본문 카드 */
             .profile-card { 
                 background: white; 
                 padding: 30px 20px; 
@@ -159,7 +159,6 @@ export default async function handler(req, res) {
         </style>
     </head>
     <body>
-        <!-- 1. 앱 설치 배너 (QR 접속이 아닐 때만 렌더링) -->
         ${!isFromQr ? `
         <div id="installBanner" class="install-banner">
             <span>📱 홈 화면에 앱으로 추가하기</span>
@@ -167,14 +166,18 @@ export default async function handler(req, res) {
         </div>
         ` : ''}
 
-        <!-- 2. 메인 컨테이너 영역 -->
         <div class="main-container">
             
-            <!-- [위치 변경 지점] QR 카드를 명함 본문 카드의 상단에 배치 -->
+            <!-- QR 코드 카드 (상단) -->
             <div class="qr-card">
                 <img src="${qrImageUrl}" alt="명함 공유용 QR 코드" width="130" height="130" />
-                <div class="qr-caption">카메라로 스캔하여 명함 공유</div>
+                <div class="qr-caption">카메라로 스캔하여 명함 공유 (?from=qr)</div>
             </div>
+
+            <!-- 스마트폰 연락처 저장 버튼 -->
+            <button id="saveContactBtn" class="save-contact-btn">
+                👤 연락처 스마트폰에 저장하기
+            </button>
 
             <!-- 명함 본문 카드 -->
             <div class="profile-card">
@@ -183,14 +186,66 @@ export default async function handler(req, res) {
 
         </div>
 
-        <!-- 3. PWA 설치 처리 스크립트 (QR 접속 시 제외) -->
+        <!-- 연락처 변환 및 OS별 저장 트리거 스크립트 -->
+        <script>
+            document.getElementById('saveContactBtn').addEventListener('click', () => {
+                // 1. 블로그 본문 HTML에서 텍스트 정보만 정제하여 가져옵니다.
+                const profileCard = document.querySelector('.profile-card');
+                const rawText = profileCard ? profileCard.innerText : '';
+
+                // 2. 본문 텍스트 내에서 전화번호와 이메일을 자동 감지하는 정규식
+                const phoneRegex = /(?:010|02|0[3-6][1-9])[-.\\s]?\\d{3,4}[-.\\s]?\\d{4}/g;
+                const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/g;
+
+                const phones = rawText.match(phoneRegex) || [];
+                const emails = rawText.match(emailRegex) || [];
+
+                const detectedPhone = phones[0] || '';
+                const detectedEmail = emails[0] || '';
+                const detectedName = "${profileName}".trim();
+
+                // 3. 연락처 표준 규격인 vCard 3.0 문자열 생성
+                const vcard = [
+                    'BEGIN:VCARD',
+                    'VERSION:3.0',
+                    'FN:' + detectedName,               // 전체 이름
+                    'N:;' + detectedName + ';;;',       // 이름 상세 분류
+                    detectedPhone ? 'TEL;TYPE=CELL:' + detectedPhone : '', // 핸드폰 번호
+                    detectedEmail ? 'EMAIL;TYPE=PREF,INTERNET:' + detectedEmail : '', // 이메일 주소
+                    'END:VCARD'
+                ].filter(Boolean).join('\\n');
+
+                // 4. 안드로이드와 iOS에서 안정적으로 호환되는 통합 다운로드 트리거
+                const blob = new Blob([vcard], { type: 'text/vcard;charset=utf-8;' });
+                const fileName = detectedName + '.vcf';
+
+                if (navigator.msSaveBlob) { // IE 대응
+                    navigator.msSaveBlob(blob, fileName);
+                } else {
+                    const link = document.createElement('a');
+                    if (link.download !== undefined) {
+                        // iOS Safari 및 최신 모바일 브라우저를 위해 Object URL 사용
+                        const url = URL.createObjectURL(blob);
+                        link.setAttribute('href', url);
+                        link.setAttribute('download', fileName);
+                        link.style.visibility = 'hidden';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        
+                        // 메모리 해제
+                        setTimeout(() => URL.revokeObjectURL(url), 100);
+                    }
+                }
+            });
+        </script>
+
         ${!isFromQr ? `
         <script>
             let deferredPrompt;
             const banner = document.getElementById('installBanner');
             const btn = document.getElementById('installBtn');
 
-            // 크롬/안드로이드 설치 이벤트 감지
             window.addEventListener('beforeinstallprompt', (e) => {
                 e.preventDefault();
                 deferredPrompt = e;
@@ -210,7 +265,6 @@ export default async function handler(req, res) {
                 });
             }
 
-            // iOS 사파리 안내 (사파리는 beforeinstallprompt 미지원)
             const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
             const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
 
@@ -224,7 +278,6 @@ export default async function handler(req, res) {
     </html>
     `;
 
-    // 7. 브라우저로 최종 화면 전송
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.status(200).send(html);
   } catch (error) {
