@@ -1,12 +1,77 @@
 export default async function handler(req, res) {
   const name = req.query.name;
-  // QR 접속 여부 체크 (?source=qr 또는 ?from=qr)
   const isFromQr = req.query.source === 'qr' || req.query.from === 'qr' || req.query.qr === '1';
 
   if (!name || name === 'favicon.ico') {
     return res.status(400).send("이름을 입력해주세요. (예: 주소창 끝에 /홍길동 입력)");
   }
 
+  // =========================================================================
+  // [추가] 1. 서비스 워커 파일 동적 서비스 요청 처리 (?sw=1 요청 시 자바스크립트 반환)
+  // =========================================================================
+  if (req.query.sw === '1') {
+    const swCode = `
+      const CACHE_NAME = 'profile-card-v1';
+      const ASSETS_TO_CACHE = [
+        '/${encodeURIComponent(name)}',
+        'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'
+      ];
+
+      // 최초 설치 시 기본 에셋 캐싱
+      self.addEventListener('install', (event) => {
+        event.waitUntil(
+          caches.open(CACHE_NAME).then((cache) => {
+            return cache.addAll(ASSETS_TO_CACHE);
+          }).then(() => self.skipWaiting())
+        );
+      });
+
+      // 활성화 시 오래된 캐시 정리
+      self.addEventListener('activate', (event) => {
+        event.waitUntil(
+          caches.keys().then((cacheNames) => {
+            return Promise.all(
+              cacheNames.map((cache) => {
+                if (cache !== CACHE_NAME) {
+                  return caches.delete(cache);
+                }
+              })
+            );
+          }).then(() => self.clients.claim())
+        );
+      });
+
+      // 네트워크 요청 가로채기 (오프라인 캐싱 작동)
+      self.addEventListener('fetch', (event) => {
+        event.respondWith(
+          caches.match(event.request).then((cachedResponse) => {
+            if (cachedResponse) {
+              return cachedResponse; // 캐시된 데이터 반환
+            }
+            return fetch(event.request).then((response) => {
+              // 유효한 응답인 경우에만 실시간으로 캐시에 추가 (네트워크 우선 업데이트)
+              if (response && response.status === 200 && response.type === 'basic') {
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                  cache.put(event.request, responseToCache);
+                });
+              }
+              return response;
+            });
+          }).catch(() => {
+            // 네트워크가 끊기고 캐시도 없을 때 기본 페이지 서빙
+            return caches.match('/${encodeURIComponent(name)}');
+          })
+        );
+      });
+    `;
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    return res.status(200).send(swCode);
+  }
+
+  // =========================================================================
+  // 2. 일반 명함 서빙 로직 시작
+  // =========================================================================
   try {
     const blogUrl = `https://profilecard9.blogspot.com/feeds/posts/default?q=${encodeURIComponent(name)}&alt=json`;
     const response = await fetch(blogUrl);
@@ -20,7 +85,7 @@ export default async function handler(req, res) {
     const profileName = entry.title.$t;
     const profileContent = entry.content.$t;
 
-    // --- 1. 블로그 본문에서 첫 번째 이미지 주소 추출 (홈 화면 앱 아이콘 전용) ---
+    // 본문에서 첫 번째 이미지 주소 추출 (홈 화면 앱 아이콘용)
     let profileImageUrl = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
     const imgRegex = /<img[^>]+src=["']([^"']+)["']/i;
     const match = profileContent.match(imgRegex);
@@ -30,12 +95,11 @@ export default async function handler(req, res) {
 
     const host = req.headers['x-forwarded-host'] || req.headers.host || 'your-domain.vercel.app';
     const protocol = req.headers['x-forwarded-proto'] || 'https';
-    // QR 접속용 URL (?source=qr)
     const qrTargetUrl = `${protocol}://${host}/${encodeURIComponent(name)}?source=qr`;
     
     const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrTargetUrl)}`;
 
-    // --- 2. PWA Manifest (본인 사진이 앱 아이콘으로 지정됨) ---
+    // PWA Manifest 설정
     const manifestJson = {
       name: `${profileName}님의 명함`,
       short_name: profileName,
@@ -166,7 +230,7 @@ export default async function handler(req, res) {
             ${!isFromQr ? `
             <div id="qrCodeSection" class="qr-card">
                 <img src="${qrImageUrl}" alt="명함 공유용 QR 코드" width="130" height="130" />
-                <div class="qr-caption">카메라로 스캔하여 명함 공유 </div>
+                <div class="qr-caption">카메라로 스캔하여 명함 공유</div>
             </div>
             ` : ''}
 
@@ -176,9 +240,23 @@ export default async function handler(req, res) {
             </div>
         </div>
 
-        <!-- PWA 설치 처리 스크립트 (QR 접속 시 제외) -->
+        <!-- PWA 설치 및 [변경] 서비스 워커 등록 스크립트 (QR 접속 시 제외) -->
         ${!isFromQr ? `
         <script>
+            // 1. 서비스 워커 등록 (?sw=1 주소 지정하여 핸들러 내부 코드와 연동)
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/${encodeURIComponent(name)}?sw=1')
+                    .then((reg) => {
+                        console.log('Service Worker registered successfully:', reg.scope);
+                    })
+                    .catch((err) => {
+                        console.error('Service Worker registration failed:', err);
+                    });
+                });
+            }
+
+            // 2. 설치 프로프 수집 및 배너 노출 처리
             let deferredPrompt;
             const banner = document.getElementById('installBanner');
             const btn = document.getElementById('installBtn');
