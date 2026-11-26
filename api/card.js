@@ -1,6 +1,7 @@
 export default async function handler(req, res) {
   const name = req.query.name;
-  const isFromQr = req.query.from === 'qr' || req.query.qr === '1';
+  // QR 접속 여부 체크 (?source=qr 또는 ?from=qr)
+  const isFromQr = req.query.source === 'qr' || req.query.from === 'qr' || req.query.qr === '1';
 
   if (!name || name === 'favicon.ico') {
     return res.status(400).send("이름을 입력해주세요. (예: 주소창 끝에 /홍길동 입력)");
@@ -19,8 +20,8 @@ export default async function handler(req, res) {
     const profileName = entry.title.$t;
     const profileContent = entry.content.$t;
 
-    // --- 1. 블로그 본문에서 첫 번째 이미지(사진) URL 동적 추출 (바탕화면 PWA 아이콘용) ---
-    let profileImageUrl = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"; // 기본 대체 이미지
+    // --- 1. 블로그 본문에서 첫 번째 이미지 주소 추출 (홈 화면 앱 아이콘 전용) ---
+    let profileImageUrl = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
     const imgRegex = /<img[^>]+src=["']([^"']+)["']/i;
     const match = profileContent.match(imgRegex);
     if (match && match[1]) {
@@ -29,11 +30,12 @@ export default async function handler(req, res) {
 
     const host = req.headers['x-forwarded-host'] || req.headers.host || 'your-domain.vercel.app';
     const protocol = req.headers['x-forwarded-proto'] || 'https';
-    const qrTargetUrl = `${protocol}://${host}/${encodeURIComponent(name)}?from=qr`;
+    // QR 접속용 URL (?source=qr)
+    const qrTargetUrl = `${protocol}://${host}/${encodeURIComponent(name)}?source=qr`;
     
     const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrTargetUrl)}`;
 
-    // --- 2. PWA Manifest 설정 (바탕화면 설치 시 본인 사진이 아이콘으로 적용됨) ---
+    // --- 2. PWA Manifest (본인 사진이 앱 아이콘으로 지정됨) ---
     const manifestJson = {
       name: `${profileName}님의 명함`,
       short_name: profileName,
@@ -44,7 +46,7 @@ export default async function handler(req, res) {
       theme_color: "#2563eb",
       icons: [
         {
-          src: profileImageUrl, // 동적 추출된 이미지 적용
+          src: profileImageUrl,
           sizes: "512x512",
           type: "image/png",
           purpose: "any maskable"
@@ -89,7 +91,7 @@ export default async function handler(req, res) {
                 box-sizing: border-box;
             }
 
-            /* 앱 설치 배너 */
+            /* 앱 설치 유도 상단 배너 */
             .install-banner {
                 background: #2563eb;
                 color: #ffffff;
@@ -124,31 +126,7 @@ export default async function handler(req, res) {
                 margin-bottom: 40px;
             }
 
-            /* (선택 사항) 상단 연락처 저장 버튼 활성화 시 스타일 */
-            .save-contact-btn-top {
-                background: #10b981;
-                color: white;
-                border: none;
-                padding: 15px;
-                border-radius: 12px;
-                font-size: 16px;
-                font-weight: bold;
-                cursor: pointer;
-                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                gap: 8px;
-                width: 100%;
-                box-sizing: border-box;
-                transition: transform 0.1s ease;
-            }
-            .save-contact-btn-top:active {
-                transform: scale(0.98);
-                background: #059669;
-            }
-
-            /* QR 코드 카드 */
+            /* 상단 QR 코드 카드 */
             .qr-card {
                 background: white; 
                 padding: 20px; 
@@ -169,13 +147,13 @@ export default async function handler(req, res) {
                 padding: 30px 20px; 
                 border-radius: 16px; 
                 box-shadow: 0 10px 20px rgba(0,0,0,0.1); 
-                text-align: center;
                 box-sizing: border-box;
                 line-height: 1.6;
             }
         </style>
     </head>
     <body>
+        <!-- PWA 설치 배너 (QR 접속 시 미노출) -->
         ${!isFromQr ? `
         <div id="installBanner" class="install-banner">
             <span>📱 홈 화면에 앱으로 추가하기</span>
@@ -184,125 +162,21 @@ export default async function handler(req, res) {
         ` : ''}
 
         <div class="main-container">
-            <!-- 1. 상단 QR 코드 카드 -->
-            <div class="qr-card">
+            <!-- 1. 상단 QR 코드 카드 (QR로 스캔해 들어온 경우 자동 숨김 처리됨) -->
+            ${!isFromQr ? `
+            <div id="qrCodeSection" class="qr-card">
                 <img src="${qrImageUrl}" alt="명함 공유용 QR 코드" width="130" height="130" />
-                <div class="qr-caption">카메라로 스캔하여 명함 공유 (?from=qr)</div>
+                <div class="qr-caption">카메라로 스캔하여 명함 공유 (?source=qr)</div>
             </div>
+            ` : ''}
 
-            <!-- 2. (옵션) 상단 고정 저장 버튼 (필요할 경우 아래 주석 해제) -->
-            <!--
-            <button id="topSaveContactBtn" class="save-contact-btn-top">
-                👤 연락처 스마트폰에 저장하기
-            </button>
-            -->
-
-            <!-- 3. 명함 본문 카드 (중복 원형 아바타를 지우고 깔끔하게 본문만 출력) -->
+            <!-- 2. 명함 본문 카드 (블로그에서 작성하신 HTML 그대로 출력) -->
             <div class="profile-card">
                 <div class="profile-content">${profileContent}</div>
             </div>
         </div>
 
-        <script>
-            // 공통 연락처 저장 기능 로직
-            const triggerSaveContact = () => {
-                const profileCard = document.querySelector('.profile-card');
-                const rawText = profileCard ? profileCard.innerText : '';
-                const lines = rawText.split('\\n').map(l => l.trim()).filter(Boolean);
-
-                const findByPrefix = (keywords) => {
-                    for (const line of lines) {
-                        for (const kw of keywords) {
-                            if (line.toLowerCase().startsWith(kw.toLowerCase())) {
-                                return line.substring(kw.length).replace(/^[:\\-\\s]+/, '').trim();
-                            }
-                        }
-                    }
-                    return '';
-                };
-
-                const detectedName = "${profileName}".trim();
-
-                const mobileMatch = rawText.match(/010[-.\\s]?\\d{4}[-.\\s]?\\d{4}/);
-                const mobilePhone = mobileMatch ? mobileMatch[0].replace(/[^0-9]/g, '') : '';
-
-                const workPhoneMatch = rawText.match(/(?:02|0[3-6][1-5]|070)[-.\\s]?\\d{3,4}[-.\\s]?\\d{4}/);
-                const workPhone = workPhoneMatch ? workPhoneMatch[0].replace(/[^0-9]/g, '') : '';
-
-                const emailMatch = rawText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/);
-                const email = emailMatch ? emailMatch[0] : '';
-
-                const company = findByPrefix(['회사', '소속', '직장', '상호', 'Company']);
-                const department = findByPrefix(['부서', '팀', '본부', 'Department']);
-                const title = findByPrefix(['직급', '직책', '직함', '포지션', 'Title']);
-
-                let address = findByPrefix(['주소', '위치', '오시는 길', 'Address', 'Location']);
-                if (!address) {
-                    const addrMatch = rawText.match(/(?:서울|경기|인천|부산|대구|광주|대전|울산|세종|강원|충북|충남|전북|전남|경북|경남|제주)[가-힣\\s0-9-]+(?:로|길|동|읍|면|번지)\\s?[0-9-]*/);
-                    if (addrMatch) address = addrMatch[0];
-                }
-
-                const urlMatch = rawText.match(/https?:\\/\\/[^\\s]+/);
-                const website = urlMatch ? urlMatch[0] : '';
-
-                const vcardParts = [
-                    'BEGIN:VCARD',
-                    'VERSION:3.0',
-                    'FN;CHARSET=UTF-8:' + detectedName,
-                    'N;CHARSET=UTF-8:;' + detectedName + ';;;'
-                ];
-
-                if (mobilePhone) vcardParts.push('TEL;TYPE=CELL,VOICE:' + mobilePhone);
-                if (workPhone && workPhone !== mobilePhone) vcardParts.push('TEL;TYPE=WORK,VOICE:' + workPhone);
-                if (email) vcardParts.push('EMAIL;TYPE=PREF,INTERNET:' + email);
-                if (company || department) {
-                    vcardParts.push('ORG;CHARSET=UTF-8:' + (company || '') + ';' + (department || ''));
-                }
-                if (title) vcardParts.push('TITLE;CHARSET=UTF-8:' + title);
-                if (address) {
-                    vcardParts.push('ADR;TYPE=WORK;CHARSET=UTF-8:;;' + address + ';;;;');
-                }
-                if (website) vcardParts.push('URL:' + website);
-
-                vcardParts.push('END:VCARD');
-
-                const vcardString = vcardParts.join('\\r\\n');
-                const blob = new Blob([vcardString], { type: 'text/vcard;charset=utf-8;' });
-                const fileName = detectedName + '.vcf';
-                const link = document.createElement('a');
-                const url = URL.createObjectURL(blob);
-                
-                link.setAttribute('href', url);
-                link.setAttribute('download', fileName);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-
-                setTimeout(() => URL.revokeObjectURL(url), 100);
-            };
-
-            // 이벤트 바인딩 로직 (상단 고정 버튼 & 블로그 내부 버튼 모두 감지 가능)
-            document.addEventListener('DOMContentLoaded', () => {
-                // 1) 상단 옵션 버튼이 켜져있을 경우 연동
-                const topBtn = document.getElementById('topSaveContactBtn');
-                if (topBtn) {
-                    topBtn.addEventListener('click', triggerSaveContact);
-                }
-
-                // 2) 블로그 본문 내에 생성하신 [Save] 버튼을 자동으로 감지하여 저장 기능 연동
-                // 블로그 글 작성 시, 버튼 요소에 id="saveContactBtn" 또는 class="save-contact-btn"을 지정하시면 작동합니다.
-                const blogBtn = document.getElementById('saveContactBtn') || document.querySelector('.save-contact-btn');
-                if (blogBtn) {
-                    blogBtn.removeAttribute('href'); // 링크가 열리지 않도록 초기화
-                    blogBtn.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        triggerSaveContact();
-                    });
-                }
-            });
-        </script>
-
+        <!-- PWA 설치 처리 스크립트 (QR 접속 시 제외) -->
         ${!isFromQr ? `
         <script>
             let deferredPrompt;
